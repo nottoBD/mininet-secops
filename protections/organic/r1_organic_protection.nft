@@ -1,0 +1,19 @@
+#!/usr/sbin/nft -f
+
+# Router R1 firewall rules (Workstation LAN)
+# Allows workstations (10.1.0.0/24) to initiate connections to any destination
+# Only permits return traffic (established/related) from DMZ/Internet to workstations
+
+flush ruleset
+
+table inet filter {
+    chain forward {
+        type filter hook forward priority 0; policy drop;
+
+        # Workstations (eth0) can send NEW connections to any destination
+        iifname "r1-eth0" ip saddr 10.1.0.0/24 ct state new accept
+
+        # Allow responses to workstations from DMZ/Internet
+        iifname "r1-eth12" ip daddr 10.1.0.0/24 ct state established,related accept
+    }
+}

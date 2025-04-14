@@ -1,0 +1,23 @@
+#!/usr/sbin/nft -f
+
+# DMZ servers firewall rules
+# Prevents DMZ servers from initiating any connections (ping or TCP/UDP)
+# Only allows responses to established/related incoming connections
+
+flush ruleset
+
+table inet filter {
+    chain input {
+        type filter hook input priority 0; policy accept;
+    }
+
+    chain forward {
+        type filter hook forward priority 0; policy drop;
+    }
+
+    chain output {
+        type filter hook output priority 0; policy drop;
+        # Allow only responses to established connections
+        ct state established,related accept
+    }
+}
