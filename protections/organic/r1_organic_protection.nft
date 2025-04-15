@@ -1,0 +1,19 @@
+#!/usr/sbin/nft -f
+
+# Router R1 Firewall Rules
+# - Allows workstation-initiated connections to any destination
+# - Permits return traffic from external networks to workstations
+
+flush ruleset
+
+table inet filter {
+    chain forward {
+        type filter hook forward priority 0; policy drop;
+
+        # Workstations → Any (new connections)
+        iifname "r1-eth0" ip saddr 10.1.0.0/24 ct state new accept
+
+        # Any → Workstations (established returns)
+        iifname "r1-eth12" ip daddr 10.1.0.0/24 ct state established,related accept
+    }
+}
