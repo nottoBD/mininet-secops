@@ -1,3 +1,4 @@
+### 1.0. Initial Assessment
 ```bash
 # Check initial ARP table state (should be empty)
 ws3 arp -n

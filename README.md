@@ -5,7 +5,9 @@
 - **[1. ARP Cache Poisoning](#1-arp-cache-poisoning)**
   - [1.1 Attack ](#11-attack)
   - [1.2 Protections](#12-protections)
-
+- **[2. Network Scan](#2-network-scan)**
+  - [2.1 Attack ](#21-attack)
+  - [2.2 Protections](#22-protections)
 
 ---
 
@@ -14,7 +16,7 @@
 ```bash
 cd $HOME/LINFO2347
 git clone git@github.com:nottoBD/mininet-secops.git
-chmod mininet-secops/u+x run_deploy 
+chmod u+x mininet-secops/run_deploy 
 ./mininet-secops/run_deploy 
 ```
 The **run_deploy** script clears and redeploy the complete Mininet environment. If required It will update attack scripts, protection scripts, the network topology file (topo.py).
@@ -25,12 +27,13 @@ source /home/student-linfo2347/mininet/protections/organic/run_organic_protectio
  ```
 
 ## ii. Organic Enterprise Protections
+![Mininet Topology](mininet_topology.png)
+
 **ii.1. DMZ Server Restrictions**
 * **Implementation:** DMZ hosts (`dmz_organic_protection.nft`) have an `output` chain policy of `drop`, only allowing `established/related` traffic.
 * **Effect:**
    * DMZ servers cannot initiate new connections (TCP/UDP/ICMP)
    * Only permit responses to connections initiated by others
-   * Example: HTTP server can respond to workstation requests, but cannot make outbound requests
 
 **ii.2. Workstation Permissions**
 * **Router R1 Rules (`r1_organic_protection.nft`):**
@@ -61,7 +64,7 @@ iifname "r2-eth0" ip saddr 10.2.0.0/24 ip daddr 10.1.0.0/24 ct state established
 ---
 
 ## 1. ARP Cache Poisoning
-
+*see walkthrough at: [attacks/arp_cache_poisoning/execution_example.md](attacks/arp_cache_poisoning/execution_example.md)*
 ### 1.1 Attack
 1. **Target Selection**:  
    - Focuses on the trusted LAN (10.1.0.0/24), specifically workstation `ws3` (10.1.0.3) and gateway `r1` (10.1.0.1).  
@@ -101,7 +104,7 @@ iifname "r2-eth0" ip saddr 10.2.0.0/24 ip daddr 10.1.0.0/24 ct state established
 - Cannot poison DMZ servers (10.12.0.10/20/30/40) due to:  
   - **DMZ router MAC validation** (e.g., 10.12.0.1 → 00:00:00:00:01:12).  
   - **R2's router impersonation detection** (blocks spoofed 10.12.0.2 MACs).
-  - 
+  
 
 ### 1.2 Protections
 1. **DMZ Protections (`dmz_arp_protection.nft`):**  
@@ -127,7 +130,7 @@ iifname "r2-eth0" ip saddr 10.2.0.0/24 ip daddr 10.1.0.0/24 ct state established
    - **Router Impersonation Detection**:  
      - Logs/drops replies claiming to be R2’s IP (10.12.0.2) with wrong MACs.  
 
-4. **Workstation Protections (`wsx_arp_protection.nft`):**  
+4. **Workstation Protections (`ws_arp_protection.nft`):**  
    - **Gateway MAC Validation**:  
      - Drops replies claiming `10.1.0.1` with non-00:00:00:00:01:00 MACs.  
    - **Intra-Subnet Rate Limits**:  

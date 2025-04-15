@@ -2,26 +2,17 @@
 
 flush ruleset
 
-table arp filter {
+table inet filter {
     chain input {
-        type filter hook input priority filter; policy accept;
+        type filter hook input priority 0; policy accept;
+    }
 
-        # Allow only ARP requests/replies
-        arp operation != { request, reply } accept
+    chain forward {
+        type filter hook forward priority 0; policy drop;
+    }
 
-        # Block unsolicited ARP replies (non-broadcast)
-        arp operation reply arp daddr ether != ff:ff:ff:ff:ff:ff counter log prefix "DMZ-GRATUITOUS-ARP: " drop
-
-        # Validate router MACs
-        arp operation reply arp saddr ip 10.12.0.1 arp saddr ether != 00:00:00:00:01:12 counter drop
-        arp operation reply arp saddr ip 10.12.0.2 arp saddr ether != 00:00:00:00:02:12 counter drop
-
-        # Rate limit requests
-        arp operation request meter per-source { ether saddr limit rate 5/minute burst 1 } accept
-        arp operation request counter log prefix "DMZ-ARP-FLOOD: " drop
-
-        # Rate limit replies
-        arp operation reply meter per-source-reply { ether saddr limit rate 3/minute burst 1 } accept
-        arp operation reply counter log prefix "DMZ-ARP-REPLY-FLOOD: " drop
+    chain output {
+        type filter hook output priority 0; policy drop;
+        ip daddr {10.2.0.0/24, 10.1.0.0/24, 10.12.0.1, 10.12.0.2} ct state established,related accept
     }
 }

@@ -1,17 +1,8 @@
-#!/usr/bin/env python3
-
-"""
-ARP Cache Poisoning Protection Deployment Script
-
-Usage:
-    mininet> source protections/arp_cache_poisoning/run_arp_protections.py
-"""
-
 py dns.cmd("sudo nft -f /home/student-linfo2347/mininet/protections/arp_cache_poisoning/dmz_arp_protection.nft")
 py ftp.cmd("sudo nft -f /home/student-linfo2347/mininet/protections/arp_cache_poisoning/dmz_arp_protection.nft")
 py http.cmd("sudo nft -f /home/student-linfo2347/mininet/protections/arp_cache_poisoning/dmz_arp_protection.nft")
 py ntp.cmd("sudo nft -f /home/student-linfo2347/mininet/protections/arp_cache_poisoning/dmz_arp_protection.nft")
 py r1.cmd("sudo nft -f /home/student-linfo2347/mininet/protections/arp_cache_poisoning/r1_arp_protection.nft")
 py r2.cmd("sudo nft -f /home/student-linfo2347/mininet/protections/arp_cache_poisoning/r2_arp_protection.nft")
-py ws2.cmd("sudo nft -f /home/student-linfo2347/mininet/protections/arp_cache_poisoning/wsx_arp_protection.nft")
-py ws3.cmd("sudo nft -f /home/student-linfo2347/mininet/protections/arp_cache_poisoning/wsx_arp_protection.nft")
+py ws2.cmd("sudo nft -f /home/student-linfo2347/mininet/protections/arp_cache_poisoning/ws_arp_protection.nft")
+py ws3.cmd("sudo nft -f /home/student-linfo2347/mininet/protections/arp_cache_poisoning/ws_arp_protection.nft")

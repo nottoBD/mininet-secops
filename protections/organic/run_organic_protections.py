@@ -1,6 +1,0 @@
-py dns.cmd("sudo nft -f /home/student-linfo2347/mininet/protections/organic/dmz_organic_protection.nft")
-py ftp.cmd("sudo nft -f /home/student-linfo2347/mininet/protections/organic/dmz_organic_protection.nft")
-py http.cmd("sudo nft -f /home/student-linfo2347/mininet/protections/organic/dmz_organic_protection.nft")
-py ntp.cmd("sudo nft -f /home/student-linfo2347/mininet/protections/organic/dmz_organic_protection.nft")
-py r1.cmd("sudo nft -f /home/student-linfo2347/mininet/protections/organic/r1_organic_protection.nft")
-py r2.cmd("sudo nft -f /home/student-linfo2347/mininet/protections/organic/r2_organic_protection.nft")

@@ -2,32 +2,27 @@
 
 flush ruleset
 
-table arp filter {
-    set suspicious_hosts {
-        type ether_addr
-        flags timeout
-        timeout 10m
-    }
-
+table inet filter {
     chain input {
-        type filter hook input priority filter; policy accept;
-
-        arp operation != { request, reply } accept
-        ether saddr @suspicious_hosts counter drop
-
-        # Block unsolicited replies
-        arp operation reply arp daddr ether != ff:ff:ff:ff:ff:ff counter drop
-
-        # Detect router impersonation
-        arp operation reply arp saddr ip { 10.2.0.1, 10.12.0.2 } \
-            meter router-impersonation { ether saddr timeout 1h limit rate 1/hour } \
-            counter log prefix "R2-ROUTER-IMPERSONATION: " \
-            add @suspicious_hosts { ether saddr timeout 10m } drop
-
-        # Rate limits
-        arp operation request meter per-mac { ether saddr limit rate 8/minute burst 5 } accept
-        arp operation request counter log prefix "R2-ARP-REQUEST-FLOOD: " drop
-        arp operation reply meter per-mac-reply { ether saddr limit rate 5/minute burst 3 } accept
-        arp operation reply counter log prefix "R2-ARP-REPLY-FLOOD: " drop
+        type filter hook input priority 0; policy accept;
     }
+
+    chain forward {
+        type filter hook forward priority 0; policy drop;
+
+        iif "r2-eth12" ip saddr 10.1.0.0/24 accept
+
+        iif "r2-eth12" ip saddr 10.12.0.0/24 ip daddr 10.2.0.0/24 ct state established,related accept
+
+        iif "r2-eth12" ip saddr 10.12.0.0/24 ip daddr 10.1.0.0/24 accept
+
+        iif "r2-eth0" ip saddr 10.2.0.0/24 ip daddr 10.1.0.0/24 ct state established,related accept
+
+        iif "r2-eth0" ip saddr 10.2.0.0/24 ip daddr 10.12.0.0/24 ct state new,established,related accept
+    }
+
+    chain output {
+        type filter hook output priority 0; policy accept;
+    }
+
 }
