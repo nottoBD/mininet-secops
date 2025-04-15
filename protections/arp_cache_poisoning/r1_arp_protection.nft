@@ -1,0 +1,33 @@
+#!/usr/sbin/nft -f
+
+flush ruleset
+
+table arp filter {
+    map trusted_mappings {
+        type ipv4_addr : ether_addr
+        elements = {
+            10.1.0.1 : 00:00:00:00:01:00,    # R1 LAN interface
+            10.12.0.1 : 00:00:00:00:01:12,    # R1 DMZ interface
+            10.12.0.2 : 00:00:00:00:02:12     # R2 DMZ interface
+        }
+    }
+
+    chain input {
+        type filter hook input priority filter; policy accept;
+
+        arp operation != { request, reply } accept
+        arp operation reply arp daddr ether != ff:ff:ff:ff:ff:ff counter drop
+
+        # Validate trusted IP-MAC pairs
+        arp operation reply arp saddr ip . arp saddr ether != @trusted_mappings \
+            counter log prefix "R1-ARP-SPOOF: " drop
+
+        # Rate limit requests
+        arp operation request meter per-mac { ether saddr limit rate 5/minute burst 2 } accept
+        arp operation request counter log prefix "R1-ARP-REQUEST-FLOOD: " drop
+
+        # Rate limit replies
+        arp operation reply meter per-mac-reply { ether saddr limit rate 5/minute burst 2 } accept
+        arp operation reply counter log prefix "R1-ARP-REPLY-FLOOD: " drop
+    }
+}

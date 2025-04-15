@@ -1,161 +1,146 @@
-# ARP Cache Poisoning Attack and Protection Test Procedure
-
-This document provides step-by-step instructions for testing both the ARP cache poisoning attack and its protection mechanism in the mininet environment.
-
----
-
 
 ## Table of Contents
-- [Prerequisites](#prerequisites)
-- [0. General Setup](#0-general-setup)
+- [i. General Setup](#i-general-setup)
+- [ii. Organic Enterprise Protections](#ii-organic-enterprise-protections)
 - **[1. ARP Cache Poisoning](#1-arp-cache-poisoning)**
-  - [1.1 Test Attack (Before Protection)](#11-test-attack-before-protection)
-  - [1.2 Reset and Apply Protection](#12-reset-and-apply-protection)
-  - [1.3 Test Attack With Protection](#13-test-attack-with-protection)
-  - [1.4 Deploy Complete Protection](#14-deploy-complete-protection)
-  - [1.5 Test Attack After Timeout Period](#15-test-attack-after-timeout-period)
-  - [1.6 Traffic Inspection](#16-traffic-inspection)
+  - [1.1 Attack ](#11-attack)
+  - [1.2 Protections](#12-protections)
+
 
 ---
 
-## 0. General Setup
+## i. General Setup
 
 ```bash
-# Make the script executable
-chmod u+x run_deploy 
-
-# Update or Build the network
-./run_deploy 
+cd $HOME/LINFO2347
+git clone git@github.com:nottoBD/mininet-secops.git
+chmod mininet-secops/u+x run_deploy 
+./mininet-secops/run_deploy 
 ```
-The **run_deploy** script clears and redeploy the complete Mininet environment. If required It will update attack scripts, protection scripts, the network topology file (topo.py), and Python dependencies from requirements.txt.
+The **run_deploy** script clears and redeploy the complete Mininet environment. If required It will update attack scripts, protection scripts, the network topology file (topo.py).
 
 The script provides the ability to enact protections  once in the Mininet environment. 
 ```bash
 source /home/student-linfo2347/mininet/protections/organic/run_organic_protections.py
  ```
-The three organic rulefiles enforce the lab’s basic protection policies through stateful filtering:
 
-    DMZ servers can't initiate a connection, only respond to an established connection.
+## ii. Organic Enterprise Protections
+**ii.1. DMZ Server Restrictions**
+* **Implementation:** DMZ hosts (`dmz_organic_protection.nft`) have an `output` chain policy of `drop`, only allowing `established/related` traffic.
+* **Effect:**
+   * DMZ servers cannot initiate new connections (TCP/UDP/ICMP)
+   * Only permit responses to connections initiated by others
+   * Example: HTTP server can respond to workstation requests, but cannot make outbound requests
 
-    Workstations can open any connection anywhere and return traffic is permitted.
+**ii.2. Workstation Permissions**
+* **Router R1 Rules (`r1_organic_protection.nft`):**
+```nftables
+iifname "r1-eth0" ip saddr 10.1.0.0/24 ct state new accept  # Allow new outbound
+iifname "r1-eth12" ip daddr 10.1.0.0/24 ct state established,related accept  # Allow returns
+```
+* **Router R2 Rules (`r2_organic_protection.nft`):**
+```nftables
+iifname "r2-eth12" ip saddr 10.1.0.0/24 ct state new accept  # Workstation→Internet
+iifname "r2-eth12" ip saddr 10.12.0.0/24 ip daddr 10.1.0.0/24 ct state established,related accept  # DMZ→WS returns
+```
+* **Effect:**
+   * Workstations can initiate connections to any network
+   * Return traffic permitted through both routers
 
-    Internet can initiate new connections only to the DMZ, while workstations can access the Internet, and bidirectional established traffic is permitted.
+**ii.3. Internet Restrictions**
+* **Router R2 Rules (`r1_organic_protection.nft`):**
+```nftables
+iifname "r2-eth0" ip saddr 10.2.0.0/24 ip daddr 10.12.0.0/24 ct state new accept  # New→DMZ only
+iifname "r2-eth0" ip saddr 10.2.0.0/24 ip daddr 10.1.0.0/24 ct state established,related accept  # Returns→WS
+```
+* **Effect:**
+   * Internet hosts can only establish new connections to DMZ (10.12.0.0/24)
+   * Workstation-initiated Internet connections are permitted via r2-eth12 rule
+   * Bidirectional established traffic allowed
 
-    The rules do not block ICMP (ping is allowed implicitly by connection tracking), address application-layer attacks, or prevent IP spoofing beyond the specified policies, focusing solely on network-layer controls as required.
+---
 
 ## 1. ARP Cache Poisoning
-The implemented ARP cache poisoning defenses include rate limiting (8 requests and 5 replies per minute) on all the network segments (workstations, routers, and DMZ servers), detection of router impersonation attempts, and temporary blocking of suspicious MAC addresses exhibiting abnormal ARP behavior. Despite these safeguards, there are significant limitations: inability to take advantage of static ARP entries due to MAC randomization in mininet, vulnerability to patient attackers who can wait between attempts, lack of authentication against a trusted MAC-IP database, and lack of correlation between observed ARP traffic and actual network topology. The solution does not negate a number of key attack channels like low-volume stealth poisoning, distributed poisoning from multiple sources, passive probing after successful poisoning, and is devoid of any mechanism to verify whether a successful MITM attack is already in progress or recover automatically compromised ARP tables.
-```bash
-Copy
 
-# Check initial ARP table state (should be empty)
-ws3 arp -n
+### 1.1 Attack
+1. **Target Selection**:  
+   - Focuses on the trusted LAN (10.1.0.0/24), specifically workstation `ws3` (10.1.0.3) and gateway `r1` (10.1.0.1).  
+   - Rationale: Compromising this pair intercepts **all traffic** from `ws3` to the DMZ (HTTP/DNS servers) and the internet via `r2`.
 
-# Ping gateway to establish legitimate ARP entry
-ws3 ping -c 3 10.1.0.1
+2. **MAC Discovery**:  
+   - Uses `scapy` to broadcast ARP requests (e.g., `resolve_mac("10.1.0.1")`) to map IPs to MACs.  
+   - Limitations:  
+     - Fails if defenses block ARP requests (e.g., workstation rate limits of **8 requests/minute**).  
+     - Invalidates if static MAC bindings (e.g., R1's `trusted_mappings`) are enforced.
 
-# Verify ARP table now has the gateway entry
-ws3 arp -n
-```
-### 1.1. Test Attack (Before Protection)
-```bash
-# Start a background tcpdump on ws2 to capture traffic
-ws2 sudo tcpdump -i ws2-eth0 -n -w /tmp/attack_capture.pcap &
+3. **ARP Spoofing**:  
+   - Sends forged ARP replies to both `ws3` and `r1` at 1-second intervals:  
+     - Tells `ws3`: "10.1.0.1 (r1)" → Attacker's MAC.  
+     - Tells `r1`: "10.1.0.3 (ws3)" → Attacker's MAC.  
+   - Tools: `poison_arp_cache()` in Python/scapy.  
+   - Limitations:  
+     - **DMZ rules** drop unsolicited replies (non-broadcast `daddr` ≠ `ff:ff:ff:ff:ff:ff`).  
+     - **R1's `trusted_mappings`** discard replies with mismatched IP-MAC pairs (e.g., spoofed `r1-eth0` MAC ≠ `00:00:00:00:01:00`).  
 
-# Run the attack with explicit parameters
-ws2 cd /home/student-linfo2347/mininet/attacks/arp_cache_poisoning/ && python3 main.py --target 10.1.0.3 --gateway 10.1.0.1 --interval 0.5 &
+4. **Traffic Interception**:  
+   - After successful poisoning, attacker becomes MITM for:  
+     - **DMZ-bound traffic** (e.g., HTTP requests to 10.12.0.10).  
+     - **Internet-bound traffic** via `r2` (10.2.0.1).  
+   - Limitations:  
+     - **Workstation rules** block replies from MACs marked as suspicious (e.g., `WSX-ROUTER-IMPERSONATION` logs/drops mismatched gateway MACs).  
+     - **R2's suspicious_hosts** set blocks MACs exceeding reply rate limits (5/minute).  
 
-# Enable IP forwarding on the attacker
-ws2 sysctl -w net.ipv4.ip_forward=1
+5. **Persistence**:  
+   - Continuous ARP reply flooding to maintain poisoned caches.  
+   - Defeated by:  
+     - **Rate limits**: DMZ (3 replies/minute), R1 (5 replies/minute), workstations (10 replies/minute).  
+     - **Logging**: All rules log flood attempts (e.g., `DMZ-ARP-REPLY-FLOOD`), alerting admins.  
 
-# Verify ARP poisoning was successful (should show ws2's MAC)
-ws3 arp -n
+**Topology-Specific Constraints**:  
+- Attacker **must reside in the trusted LAN** (e.g., `ws2`) to send Layer 2 ARP packets.  
+- Cannot poison DMZ servers (10.12.0.10/20/30/40) due to:  
+  - **DMZ router MAC validation** (e.g., 10.12.0.1 → 00:00:00:00:01:12).  
+  - **R2's router impersonation detection** (blocks spoofed 10.12.0.2 MACs).
+  - 
 
-# Test traffic redirection through attacker (should show ICMP Redirect messages)
-ws3 ping -c 3 10.12.0.10
+### 1.2 Protections
+1. **DMZ Protections (`dmz_arp_protection.nft`):**  
+   - **Static MAC Bindings**:  
+     - Enforces fixed IP-MAC pairs for routers (e.g., 10.12.0.1 → 00:00:00:00:01:12).  
+     - Neutralizes spoofed ARP replies claiming to be `r1`/`r2`.  
+   - **Unsolicited Reply Blocking**:  
+     - Drops replies not sent to broadcast MAC (`ff:ff:ff:ff:ff:ff`).  
+   - **Rate Limiting**:  
+     - Requests: 5/minute per source, preventing ARP floods.  
+     - Replies: 3/minute, limiting poisoning speed.  
 
-# Stop background processes
-ws2 pkill -f "python3 main.py"
-ws2 pkill -f "tcpdump"
-```
+2. **Router R1 Protections (`r1_arp_protection.nft`):**  
+   - **Trusted Mappings Table**:  
+     - Hardcodes valid IP-MAC pairs (e.g., 10.1.0.1 → 00:00:00:00:01:00).  
+     - Immediate drop of mismatched replies (e.g., spoofed gateway MAC).  
+   - **Rate Limits**:  
+     - 5 requests/minute and 5 replies/minute per MAC, hindering sustained attacks.  
 
-### 1.2. Reset and Apply Protection
-```bash
-# Clean up ARP tables
-ws3 arp -d 10.1.0.1
-ws3 arp -d 10.1.0.2
+3. **Router R2 Protections (`r2_arp_protection.nft`):**  
+   - **Suspicious Host List**:  
+     - Time-based bans (10m) for MACs sending invalid replies (e.g., impersonating 10.12.0.2).  
+   - **Router Impersonation Detection**:  
+     - Logs/drops replies claiming to be R2’s IP (10.12.0.2) with wrong MACs.  
 
-# Ping to re-establish legitimate ARP entry
-ws3 ping -c 1 10.1.0.1
-ws3 arp -n
+4. **Workstation Protections (`wsx_arp_protection.nft`):**  
+   - **Gateway MAC Validation**:  
+     - Drops replies claiming `10.1.0.1` with non-00:00:00:00:01:00 MACs.  
+   - **Intra-Subnet Rate Limits**:  
+     - Allows 10 ARP replies/minute from 10.1.0.0/24, limiting MITM viability.  
 
-# Apply protection to workstations
-ws3 sudo nft -f /home/student-linfo2347/mininet/protections/arp_cache_poisoning/firewall_wsx.nft
-ws2 sudo nft -f /home/student-linfo2347/mininet/protections/arp_cache_poisoning/firewall_wsx.nft
+**Residual Risks**:  
+- **Static Mapping Maintenance**: Manual updates required if MACs change (e.g., hardware replacement).  
+- **Encrypted Traffic**: Protections don’t mitigate decryption of intercepted TLS/SSH traffic.  
+- **Trusted LAN Compromise**: Attackers on `ws2` can still target `ws3` until rate limits trigger drops.  
 
-# Verify firewall rules are loaded
-ws3 sudo nft list ruleset
-```
-
-### 1.3. Test Attack With Protection
-```bash
-# Try attack again - should be limited by rate limiter
-ws2 cd /home/student-linfo2347/mininet/attacks/arp_cache_poisoning/ && python3 main.py --target 10.1.0.3 --gateway 10.1.0.1 &
-
-# Verify ARP table remains unchanged (legitimate gateway MAC)
-ws3 arp -n
-
-# Verify ping still works directly (should not see ICMP Redirects)
-ws3 ping -c 3 10.12.0.10
-
-# Check counter values in firewall
-ws3 sudo nft list ruleset | grep -A 2 "counter"
-
-# Stop attack
-ws2 pkill -f "python3 main.py"
-```
-
-### 1.4. Deploy Complete Protection
-```bash
-# Deploy full protection to all hosts
-source /home/student-linfo2347/mininet/protections/arp_cache_poisoning/run_arp_protections.py
-
-# Verify network connectivity with protection
-pingall
-```
-
-### 1.5. Test Attack After Timeout Period
-```bash 
-# Wait for rate limit timer to expire
-sleep 60
-
-# Try new attack
-ws2 cd /home/student-linfo2347/mininet/attacks/arp_cache_poisoning/ && python3 main.py --target 10.1.0.3 --gateway 10.1.0.1 &
-
-# Verify single ARP request allowed but no poisoning
-ws3 arp -n
-
-# Kill the attack again
-ws2 pkill -f "python3 main.py"
-```
-
-### 1.6. Traffic Inspection and pingall Results
-```bash
-# Outside mininet, examine the tcpdump capture
-tcpdump -n -r /tmp/attack_capture.pcap | head -20
-```
-| From\To | Default State | With Organic Protection | With Organic + ARP Protection |
-|---------|---------------|-------------------------|-------------------------------|
-| **dns**   | ✓✓✓✓✓✓✓✓ | ❌❌❌❌❌❌❌❌ | ❌❌❌❌❌❌❌❌ |
-| **ftp**   | ✓✓✓✓✓✓✓✓ | ❌❌❌❌❌❌❌❌ | ❌❌❌❌❌❌❌❌ |
-| **http**  | ✓✓✓✓✓✓✓✓ | ❌❌❌❌❌❌❌❌ | ❌❌❌❌❌❌❌❌ |
-| **internet**| ✓✓✓✓✓✓✓✓ | ✓✓✓✓❌✓❌❌ | ✓✓✓✓❌✓❌❌ |
-| **ntp**   | ✓✓✓✓✓✓✓✓ | ❌❌❌❌❌❌❌❌ | ❌❌❌❌❌❌❌❌ |
-| **r1**    | ✓✓✓✓✓✓✓✓ | ✓✓✓❌✓✓✓✓ | ✓✓✓❌✓✓✓✓ |
-| **r2**    | ✓✓✓✓✓✓✓✓ | ✓✓✓✓✓✓❌❌ | ✓✓✓✓✓✓❌❌ |
-| **ws2**   | ✓✓✓✓✓✓✓✓ | ✓✓✓✓✓✓✓✓ | ❌❌❌❌✓✓✓✓ |
-| **ws3**   | ✓✓✓✓✓✓✓✓ | ✓✓✓✓✓✓✓✓ | ✓✓✓✓✓✓✓✓ |
-| **% Drop**| 0% (0/72) | 52% (38/72) | 58% (42/72) |
+**Efficacy Metrics**:  
+- **Poisoning Attempts**: Blocked within 1–5 packets (static mappings + rate limits).  
+- **Detection**: Logs provide forensic trails (e.g., `R1-ARP-SPOOF` entries).  
 
 
-
+---

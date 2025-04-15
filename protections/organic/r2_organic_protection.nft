@@ -1,26 +1,24 @@
 #!/usr/sbin/nft -f
 
-# Router R2 firewall rules (Internet)
-# Allows Internet (10.2.0.0/24) to initiate NEW connections ONLY to DMZ (10.12.0.0/24)
-# Permits workstations (10.1.0.0/24) to initiate connections to Internet
-# Blocks Internet from reaching workstations directly
-
 flush ruleset
 
 table inet filter {
-    chain forward {
-        type filter hook forward priority 0; policy drop;
+      chain forward {
+            type filter hook forward priority 0; policy drop;
 
-        # Internet (eth0) can initiate NEW connections to DMZ
-        iifname "r2-eth0" ip saddr 10.2.0.0/24 ip daddr 10.12.0.0/24 ct state new accept
+            # Internet → DMZ (new)
+            iifname "r2-eth0" ip saddr 10.2.0.0/24 ip daddr 10.12.0.0/24 ct state new accept
 
-        # Allow responses from DMZ to Internet
-        iifname "r2-eth12" ip saddr 10.12.0.0/24 ip daddr 10.2.0.0/24 ct state established,related accept
+            # DMZ → Internet (returns)
+            iifname "r2-eth12" ip saddr 10.12.0.0/24 ip daddr 10.2.0.0/24 ct state established,related accept
 
-        # Workstations (via R1) can initiate NEW connections to Internet
-        iifname "r2-eth12" ip saddr 10.1.0.0/24 ct state new accept
+            # Workstations → Internet (new)
+            iifname "r2-eth12" ip saddr 10.1.0.0/24 ct state new accept
 
-        # Allow responses from Internet to workstations
-        iifname "r2-eth0" ip saddr 10.2.0.0/24 ip daddr 10.1.0.0/24 ct state established,related accept
-    }
+            # DMZ → Workstations (returns) [Critical Path]
+            iifname "r2-eth12" ip saddr 10.12.0.0/24 ip daddr 10.1.0.0/24 ct state established,related accept
+
+            # Internet → Workstations (returns)
+            iifname "r2-eth0" ip saddr 10.2.0.0/24 ip daddr 10.1.0.0/24 ct state established,related accept
+      }
 }

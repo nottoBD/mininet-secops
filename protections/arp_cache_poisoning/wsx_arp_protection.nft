@@ -1,0 +1,32 @@
+#!/usr/sbin/nft -f
+
+flush ruleset
+
+table arp filter {
+    set suspicious_macs {
+        type ether_addr
+        flags timeout
+        timeout 30m
+    }
+
+    chain input {
+        type filter hook input priority filter; policy accept;
+
+        arp operation != { request, reply } accept
+        ether saddr @suspicious_macs counter drop
+
+        # Validate gateway MAC
+        arp operation reply arp saddr ip 10.1.0.1 arp saddr ether != 00:00:00:00:01:00 \
+            counter log prefix "WSX-ROUTER-IMPERSONATION: " add @suspicious_macs drop
+
+        # Block unsolicited replies
+        arp operation reply arp daddr ether != ff:ff:ff:ff:ff:ff counter drop
+
+        # Intra-subnet rate limiting
+        arp operation reply arp saddr ip 10.1.0.0/24 \
+            meter intra-subnet { ether saddr limit rate 10/minute burst 4 } accept
+
+        arp operation request meter per-mac-request { ether saddr limit rate 8/minute burst 2 } accept
+        arp operation request counter log prefix "WSX-ARP-REQUEST-FLOOD: " drop
+    }
+}

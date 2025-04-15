@@ -1,0 +1,156 @@
+#!/bin/bash
+
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+RED='\033[0;31m'
+PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+NC='\033[0m'
+
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+BASE_DIR="$(dirname "$SCRIPT_DIR")"
+
+echo -e "${BLUE}======================================================${NC}"
+echo -e "${YELLOW}${BOLD}       Mininet Security Operations Deployment        ${NC}"
+echo -e "${BLUE}======================================================${NC}"
+
+SOURCE_DIR="$SCRIPT_DIR"
+TARGET_DIR="$HOME/mininet"
+
+echo -e "${YELLOW}[INFO] Ensuring target directories exist...${NC}"
+mkdir -p "$TARGET_DIR"
+mkdir -p "$BASE_DIR"
+echo -e "${GREEN}[SUCCESS] Target directories confirmed${NC}"
+
+copy_if_different() {
+    local src="$1"
+    local dst="$2"
+    local name="$3"
+
+    if [ -d "$src" ]; then
+        if [ ! -d "$dst" ]; then
+            echo -e "${GREEN}[+] Copying $name directory (new)...${NC}"
+            cp -r "$src" "$dst"
+            echo -e "${GREEN}  ✓ $name copied successfully${NC}"
+            return 0
+        else
+            echo -e "${CYAN}[CHECK] Checking if $name directory needs updating...${NC}"
+            if ! diff -q -r "$src" "$dst" &>/dev/null; then
+                echo -e "${GREEN}[+] Updating $name directory (changed)...${NC}"
+                cp -r "$src"/* "$dst/"
+                echo -e "${GREEN}  ✓ $name updated successfully${NC}"
+                return 0
+            else
+                echo -e "${BLUE}[INFO] $name directory is already up to date${NC}"
+                return 1
+            fi
+        fi
+    elif [ -f "$src" ]; then
+        if [ ! -f "$dst" ]; then
+            echo -e "${GREEN}[+] Copying $name file (new)...${NC}"
+            cp "$src" "$dst"
+            echo -e "${GREEN}  ✓ $name copied successfully${NC}"
+            return 0
+        else
+            echo -e "${CYAN}[CHECK] Checking if $name file needs updating...${NC}"
+            if ! cmp -s "$src" "$dst"; then
+                echo -e "${GREEN}[+] Updating $name file (changed)...${NC}"
+                cp "$src" "$dst"
+                echo -e "${GREEN}  ✓ $name updated successfully${NC}"
+                return 0
+            else
+                echo -e "${BLUE}[INFO] $name file is already up to date${NC}"
+                return 1
+            fi
+        fi
+    else
+        echo -e "${RED}[ERROR] Source $name not found at $src!${NC}"
+        return 2
+    fi
+}
+
+echo -e "${CYAN}[TASK] Copying files and directories...${NC}"
+
+copy_if_different "$SOURCE_DIR/attacks" "$TARGET_DIR/attacks" "attacks"
+if [ $? -eq 2 ]; then
+    echo -e "${RED}[ERROR] Attacks directory is required but not found!${NC}"
+    exit 1
+fi
+
+if [ -d "$SOURCE_DIR/protections" ]; then
+    copy_if_different "$SOURCE_DIR/protections" "$TARGET_DIR/protections" "protections"
+    DEFENSE_DIR="protections"
+elif [ -d "$SOURCE_DIR/protections" ]; then
+    echo -e "${YELLOW}[INFO] 'protections' directory found instead of 'protections', will use it${NC}"
+    copy_if_different "$SOURCE_DIR/protections" "$TARGET_DIR/protections" "protections->protections"
+    DEFENSE_DIR="protections"
+else
+    echo -e "${RED}[ERROR] Neither protections nor protections directory found!${NC}"
+    exit 1
+fi
+
+copy_if_different "$SCRIPT_DIR/topo.py" "$BASE_DIR/topo.py" "topo.py"
+if [ $? -eq 2 ]; then
+    echo -e "${RED}[ERROR] topo.py is required but not found!${NC}"
+    exit 1
+fi
+
+copy_if_different "$SOURCE_DIR/requirements.txt" "$TARGET_DIR/requirements.txt" "requirements.txt"
+if [ $? -eq 2 ]; then
+    echo -e "${YELLOW}[WARNING] requirements.txt not found, skipping dependency installation${NC}"
+else
+    if [ $? -eq 0 ]; then
+        echo -e "${PURPLE}[CONFIG] Installing required dependencies...${NC}"
+        pip3 install -r "$TARGET_DIR/requirements.txt"
+        echo -e "${GREEN}[SUCCESS] Dependencies installed successfully${NC}"
+    else
+        echo -e "${BLUE}[INFO] Dependencies already installed${NC}"
+    fi
+fi
+
+ORGANIC_DEFENSE_PATH="$TARGET_DIR/$DEFENSE_DIR/organic"
+if [ ! -d "$ORGANIC_DEFENSE_PATH" ]; then
+    echo -e "${YELLOW}[WARNING] Basic network defense directory not found at $ORGANIC_DEFENSE_PATH${NC}"
+else
+    APPLY_SCRIPT="$TARGET_DIR/$DEFENSE_DIR/organic/apply_protections.sh"
+    mkdir -p "$(dirname "$APPLY_SCRIPT")"
+    echo -e "${CYAN}[CREATING] Creating basic defense application script...${NC}"
+    cat > "$APPLY_SCRIPT" << EOL
+# Basic network defense application script
+echo "Applying basic network protections..."
+source ~/mininet/protections/organic/commands_basic_protection.py
+echo "Basic network protections applied successfully!"
+EOL
+    chmod +x "$APPLY_SCRIPT"
+    echo -e "${GREEN}[SUCCESS] Created basic defense application script at $APPLY_SCRIPT${NC}"
+fi
+
+echo -e "${BLUE}======================================================${NC}"
+echo -e "${GREEN}${BOLD}      Deployment completed successfully!            ${NC}"
+echo -e "${BLUE}======================================================${NC}"
+
+echo -e "${PURPLE}[QUESTION] Do you want to run the topology now? (y/n)${NC}"
+read -r response
+if [[ "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
+    echo -e "${CYAN}[RUNNING] Cleaning up any existing Mininet instances...${NC}"
+    sudo mn -c
+
+    echo -e "${CYAN}[STARTING] Running topology with NOMA: 20262410${NC}"
+
+    echo -e "\n${RED}${BOLD}+--------------------------------------------------------------------------------------+${NC}"
+    echo -e "${RED}${BOLD}|                            IMPORTANT INSTRUCTIONS                                    |${NC}"
+    echo -e "${RED}${BOLD}+--------------------------------------------------------------------------------------+${NC}"
+    echo -e "${YELLOW}${BOLD}| After you see the 'mininet>' prompt, run this command:                               |${NC}"
+    echo -e "${CYAN}${BOLD}| source /home/student-linfo2347/mininet/protections/organic/organic_protections.py    |${NC}"
+    echo -e "${YELLOW}${BOLD}| Then verify the rules with: r1 sudo nft list ruleset                                 |${NC}"
+    echo -e "${RED}${BOLD}+--------------------------------------------------------------------------------------+${NC}\n"
+
+    cd "$HOME" && sudo -E python3 LINFO2347/topo.py 20262410
+else
+    echo -e "${BLUE}[INFO] To run the topology later, use:${NC}"
+    echo -e "${YELLOW}sudo mn -c && sudo -E python3 ~/LINFO2347/topo.py 20262410${NC}"
+    echo -e "${BLUE}[INFO] And to apply basic protections, use:${NC}"
+    echo -e "${YELLOW}source $TARGET_DIR/$DEFENSE_DIR/organic/apply_protections.sh${NC}"
+fi
