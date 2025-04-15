@@ -2,17 +2,28 @@
 
 flush ruleset
 
-table inet filter {
+table arp dmz_arp {
+    set trusted_routers {
+        type arp saddr ipv4_addr . ether saddr
+        elements = {
+            10.12.0.1 . 00:00:00:00:01:12,
+            10.12.0.2 . 00:00:00:00:02:12
+        }
+    }
+
     chain input {
-        type filter hook input priority 0; policy accept;
-    }
+        type filter hook input priority filter; policy drop;
 
-    chain forward {
-        type filter hook forward priority 0; policy drop;
-    }
+        # Allow ARP requests (rate limited)
+        arp operation request meter arp_requests { ether saddr limit rate 5/minute } accept
 
-    chain output {
-        type filter hook output priority 0; policy drop;
-        ip daddr {10.2.0.0/24, 10.1.0.0/24, 10.12.0.1, 10.12.0.2} ct state established,related accept
+        # Allow trusted router ARP replies
+        arp operation reply arp saddr ip . ether saddr @trusted_routers accept
+
+        # Rate limit other ARP replies (3/minute)
+        arp operation reply meter arp_replies { ether saddr limit rate 3/minute } accept
+
+        # Log and drop excess
+        log prefix "DMZ-ARP-FLOOD: " drop
     }
 }

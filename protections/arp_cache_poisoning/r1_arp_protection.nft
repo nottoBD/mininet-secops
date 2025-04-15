@@ -2,19 +2,28 @@
 
 flush ruleset
 
-table inet filter {
+table arp r1_arp {
+    set trusted_mappings {
+        type arp saddr ipv4_addr . ether saddr
+        elements = {
+            10.1.0.1 . 00:00:00:00:01:00,
+            10.12.0.1 . 00:00:00:00:01:12
+        }
+    }
+
     chain input {
-        type filter hook input priority 0; policy accept;
-    }
+        type filter hook input priority filter; policy drop;
 
-    chain forward {
-        type filter hook forward priority 0; policy drop;
+        # Rate limit ARP requests (5/minute)
+        arp operation request meter arp_requests { ether saddr limit rate 5/minute } accept
 
-        iif "r1-eth0" ip saddr 10.1.0.0/24 accept
-        iif "r1-eth12" ip saddr {10.12.0.0/24,10.2.0.0/24} ip daddr 10.1.0.0/24 ct state established,related accept
-    }
+        # Validate trusted mappings for replies
+        arp operation reply arp saddr ip . ether saddr @trusted_mappings accept
 
-    chain output {
-        type filter hook output priority 0; policy accept;
+        # Rate limit other replies (5/minute)
+        arp operation reply meter arp_replies { ether saddr limit rate 5/minute } accept
+
+        # Log and drop excess
+        log prefix "R1-ARP-SPOOF: " drop
     }
 }

@@ -66,84 +66,76 @@ iifname "r2-eth0" ip saddr 10.2.0.0/24 ip daddr 10.1.0.0/24 ct state established
 ## 1. ARP Cache Poisoning
 *see walkthrough at: [attacks/arp_cache_poisoning/execution_example.md](attacks/arp_cache_poisoning/execution_example.md)*
 ### 1.1 Attack
-1. **Target Selection**:  
-   - Focuses on the trusted LAN (10.1.0.0/24), specifically workstation `ws3` (10.1.0.3) and gateway `r1` (10.1.0.1).  
-   - Rationale: Compromising this pair intercepts **all traffic** from `ws3` to the DMZ (HTTP/DNS servers) and the internet via `r2`.
+#### Target Selection
+- **Focus**: LAN hosts `ws3` (10.1.0.3) and gateway `r1` (10.1.0.1).  
+- **Goal**: Intercept traffic between `ws3` and DMZ/internet via MITM.
 
-2. **MAC Discovery**:  
-   - Uses `scapy` to broadcast ARP requests (e.g., `resolve_mac("10.1.0.1")`) to map IPs to MACs.  
-   - Limitations:  
-     - Fails if defenses block ARP requests (e.g., workstation rate limits of **8 requests/minute**).  
-     - Invalidates if static MAC bindings (e.g., R1's `trusted_mappings`) are enforced.
+#### MAC Discovery
+- **Method**: Scapy ARP broadcasts to map IP-MAC pairs.  
+- **Blocked By**:  
+  - Workstation rate limits (8 ARP requests/minute).  
+  - Static MAC bindings on `r1`.
 
-3. **ARP Spoofing**:  
-   - Sends forged ARP replies to both `ws3` and `r1` at 1-second intervals:  
-     - Tells `ws3`: "10.1.0.1 (r1)" → Attacker's MAC.  
-     - Tells `r1`: "10.1.0.3 (ws3)" → Attacker's MAC.  
-   - Tools: `poison_arp_cache()` in Python/scapy.  
-   - Limitations:  
-     - **DMZ rules** drop unsolicited replies (non-broadcast `daddr` ≠ `ff:ff:ff:ff:ff:ff`).  
-     - **R1's `trusted_mappings`** discard replies with mismatched IP-MAC pairs (e.g., spoofed `r1-eth0` MAC ≠ `00:00:00:00:01:00`).  
+#### ARP Spoofing
+- **Execution**: Forged replies sent to `ws3` and `r1` (1/second).  
+- **Blocked By**:  
+  - `r1`’s trusted mappings (fixed IP-MAC pairs).  
+  - DMZ rules dropping non-broadcast replies (dest MAC ≠ `ff:ff:ff:ff:ff:ff`).
 
-4. **Traffic Interception**:  
-   - After successful poisoning, attacker becomes MITM for:  
-     - **DMZ-bound traffic** (e.g., HTTP requests to 10.12.0.10).  
-     - **Internet-bound traffic** via `r2` (10.2.0.1).  
-   - Limitations:  
-     - **Workstation rules** block replies from MACs marked as suspicious (e.g., `WSX-ROUTER-IMPERSONATION` logs/drops mismatched gateway MACs).  
-     - **R2's suspicious_hosts** set blocks MACs exceeding reply rate limits (5/minute).  
+#### Traffic Interception
+- **Success Criteria**: Poisoned ARP caches enable MITM for:  
+  - DMZ traffic (HTTP/DNS to 10.12.0.10/20).  
+  - Internet traffic via `r2` (10.2.0.1).  
+- **Blocked By**:  
+  - Workstation gateway MAC validation (00:00:00:00:01:00).  
+  - `r2`’s suspicious MAC bans (5 replies/minute).
 
-5. **Persistence**:  
-   - Continuous ARP reply flooding to maintain poisoned caches.  
-   - Defeated by:  
-     - **Rate limits**: DMZ (3 replies/minute), R1 (5 replies/minute), workstations (10 replies/minute).  
-     - **Logging**: All rules log flood attempts (e.g., `DMZ-ARP-REPLY-FLOOD`), alerting admins.  
+#### Persistence
+- **Method**: Continuous ARP reply flooding.  
+- **Mitigation**: Rate limits:  
+  - DMZ: 3 replies/minute.  
+  - `r1`: 5 replies/minute.  
+  - Workstations: 10 replies/minute.  
 
-**Topology-Specific Constraints**:  
-- Attacker **must reside in the trusted LAN** (e.g., `ws2`) to send Layer 2 ARP packets.  
-- Cannot poison DMZ servers (10.12.0.10/20/30/40) due to:  
-  - **DMZ router MAC validation** (e.g., 10.12.0.1 → 00:00:00:00:01:12).  
-  - **R2's router impersonation detection** (blocks spoofed 10.12.0.2 MACs).
+#### Constraints
+- Attacker must reside in LAN (e.g., `ws2`).  
+- DMZ servers (10.12.0.10-40) immune due to:  
+  - Static router MAC validation (e.g., 10.12.0.1 → `00:00:00:00:01:12`).  
+  - `r2`’s impersonation detection (blocks spoofed 10.12.0.2 MACs).
   
 
 ### 1.2 Protections
-1. **DMZ Protections (`dmz_arp_protection.nft`):**  
-   - **Static MAC Bindings**:  
-     - Enforces fixed IP-MAC pairs for routers (e.g., 10.12.0.1 → 00:00:00:00:01:12).  
-     - Neutralizes spoofed ARP replies claiming to be `r1`/`r2`.  
-   - **Unsolicited Reply Blocking**:  
-     - Drops replies not sent to broadcast MAC (`ff:ff:ff:ff:ff:ff`).  
-   - **Rate Limiting**:  
-     - Requests: 5/minute per source, preventing ARP floods.  
-     - Replies: 3/minute, limiting poisoning speed.  
+#### DMZ (`dmz_arp_protection.nft`)
+- **Static MAC Bindings**:  
+  - Enforce 10.12.0.1 → `00:00:00:00:01:12`, 10.12.0.2 → `00:00:00:00:02:12`.  
+- **Unsolicited Reply Blocking**: Drop non-broadcast replies.  
+- **Rate Limits**:  
+  - 5 requests/minute per source.  
+  - 3 replies/minute.  
 
-2. **Router R1 Protections (`r1_arp_protection.nft`):**  
-   - **Trusted Mappings Table**:  
-     - Hardcodes valid IP-MAC pairs (e.g., 10.1.0.1 → 00:00:00:00:01:00).  
-     - Immediate drop of mismatched replies (e.g., spoofed gateway MAC).  
-   - **Rate Limits**:  
-     - 5 requests/minute and 5 replies/minute per MAC, hindering sustained attacks.  
+#### Router R1 (`r1_arp_protection.nft`)
+- **Trusted Mappings**:  
+  - 10.1.0.1 → `00:00:00:00:01:00`, 10.12.0.1 → `00:00:00:00:01:12`.  
+- **Rate Limits**: 5 requests/replies per minute.  
 
-3. **Router R2 Protections (`r2_arp_protection.nft`):**  
-   - **Suspicious Host List**:  
-     - Time-based bans (10m) for MACs sending invalid replies (e.g., impersonating 10.12.0.2).  
-   - **Router Impersonation Detection**:  
-     - Logs/drops replies claiming to be R2’s IP (10.12.0.2) with wrong MACs.  
+#### Router R2 (`r2_arp_protection.nft`)
+- **Suspicious Host List**:  
+  - 10-minute bans for MACs spoofing 10.12.0.2.  
+- **Logging**: Records impersonation attempts.  
 
-4. **Workstation Protections (`ws_arp_protection.nft`):**  
-   - **Gateway MAC Validation**:  
-     - Drops replies claiming `10.1.0.1` with non-00:00:00:00:01:00 MACs.  
-   - **Intra-Subnet Rate Limits**:  
-     - Allows 10 ARP replies/minute from 10.1.0.0/24, limiting MITM viability.  
+#### Workstations (`ws_arp_protection.nft`)
+- **Gateway Validation**: Drops replies for 10.1.0.1 with non-`00:00:00:00:01:00` MAC.  
+- **Rate Limits**: 10 intra-subnet replies/minute.  
 
-**Residual Risks**:  
-- **Static Mapping Maintenance**: Manual updates required if MACs change (e.g., hardware replacement).  
-- **Encrypted Traffic**: Protections don’t mitigate decryption of intercepted TLS/SSH traffic.  
-- **Trusted LAN Compromise**: Attackers on `ws2` can still target `ws3` until rate limits trigger drops.  
 
-**Efficacy Metrics**:  
-- **Poisoning Attempts**: Blocked within 1–5 packets (static mappings + rate limits).  
-- **Detection**: Logs provide forensic trails (e.g., `R1-ARP-SPOOF` entries).  
+### Residual Risks
+- **Manual Maintenance**: Static mappings require updates if MACs change.  
+- **Encrypted Traffic**: Protections don’t prevent decryption of intercepted TLS/SSH.  
+- **Trusted LAN Attacks**: `ws2` can target `ws3` until rate limits trigger.  
+
+### Efficacy Metrics
+- **Blocking**: Poisoning attempts blocked within 1–5 packets.  
+- **Detection**: Logs record events (e.g., `R1-ARP-SPOOF`, `R2-IMPERSONATION`).  
 
 
 ---

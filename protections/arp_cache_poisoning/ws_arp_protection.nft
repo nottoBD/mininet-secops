@@ -2,12 +2,23 @@
 
 flush ruleset
 
-table arp filter {
+table arp ws_arp {
+    set gateway_mac {
+        type ether_addr
+        elements = { 00:00:00:00:01:00 }
+    }
+
     chain input {
         type filter hook input priority filter; policy accept;
 
-        arp operation request meter per-mac { ether saddr limit rate 1/minute burst 1 packets } counter accept
+        # Rate limit requests
+        arp operation request limit rate 8/minute accept
+        arp operation request drop
 
-        arp operation request counter drop
-        }
+        # Validate gateway MAC
+        arp operation reply arp saddr ip 10.1.0.1 ether saddr != @gateway_mac drop
+
+        # Rate limit replies
+        arp operation reply arp saddr ip 10.1.0.0/24 limit rate 10/minute accept
+    }
 }
