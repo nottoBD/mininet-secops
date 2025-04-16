@@ -42,8 +42,8 @@ ws3 ping -c 1 10.1.0.1
 ws3 arp -n
 
 # Apply protection to workstations
-ws3 sudo nft -f /home/student-linfo2347/mininet/protections/arp_cache_poisoning/firewall_wsx.nft
-ws2 sudo nft -f /home/student-linfo2347/mininet/protections/arp_cache_poisoning/firewall_wsx.nft
+ws3 sudo nft -f /home/student-linfo2347/mininet/protections/arp_cache_poisoning/ws_arp_protection.nft
+ws2 sudo nft -f /home/student-linfo2347/mininet/protections/arp_cache_poisoning/ws_arp_protection.nft
 
 # Verify firewall rules are loaded
 ws3 sudo nft list ruleset
@@ -94,8 +94,13 @@ ws2 pkill -f "python3 main.py"
 ### 1.6. Traffic Inspection and pingall Results
 ```bash
 # Outside mininet, examine the tcpdump capture
-tcpdump -n -r /tmp/attack_capture.pcap | head -20
+tcpdump -n -r /tmp/attack_capture.pcap
 ```
+
+Our defense against ARP cache poisoning incorporates a deliberately low rate limit (5/minute) on R2, creating an asymmetric connectivity model. When ws2 was used as the attack host, it led to additional scrutiny, while ws3 exhausted the available ARP quota first.
+
+The pingall results prove our defense against ARP spoofing attacks with respect to connectivity, showing the necessity of finely tuned and granular defense in production environments.
+
 | From\To | Default State | With Organic Protection | With Organic + ARP Protection |
 |---------|---------------|-------------------------|-------------------------------|
 | **dns**   | ✓✓✓✓✓✓✓✓ | ❌❌❌❌❌❌❌❌ | ❌❌❌❌❌❌❌❌ |
