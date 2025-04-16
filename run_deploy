@@ -114,24 +114,24 @@ echo -e "${BLUE}======================================================${NC}"
 echo -e "${GREEN}${BOLD}      Deployment completed successfully!            ${NC}"
 echo -e "${BLUE}======================================================${NC}"
 
-echo -e "${PURPLE}[QUESTION] Do you want to run the topology now? (y/n)${NC}"
+echo -e "${PURPLE}[QUESTION] Do you want to run the topology now? (Y/n)${NC}"
 read -r response
-if [[ "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
+if [[ "$response" =~ ^([yY][eE][sS]|[yY]|'')$ ]]; then
     echo -e "${CYAN}[RUNNING] Cleaning up any existing Mininet instances...${NC}"
     sudo mn -c
 
-    echo -e "${CYAN}[STARTING] Running topology with NOMA: 20262410${NC}"
+    echo -e "${CYAN}[STARTING] Running topology${NC}"
 
     echo -e "\n${RED}${BOLD}+--------------------------------------------------------------------------------------+${NC}"
     echo -e "${RED}${BOLD}|                            IMPORTANT INSTRUCTIONS                                    |${NC}"
     echo -e "${RED}${BOLD}+--------------------------------------------------------------------------------------+${NC}"
     echo -e "${YELLOW}${BOLD}| After you see the 'mininet>' prompt, run this command:                               |${NC}"
-    echo -e "${CYAN}${BOLD}| source /home/student-linfo2347/mininet/protections/organic/run_organic_protections.py    |${NC}"
+    echo -e "${CYAN}${BOLD}| source mininet/protections/organic/run_organic_protections.py                        |${NC}"
     echo -e "${YELLOW}${BOLD}| Then verify the rules with: r1 sudo nft list ruleset                                 |${NC}"
     echo -e "${RED}${BOLD}+--------------------------------------------------------------------------------------+${NC}\n"
 
-    cd "$HOME" && sudo -E python3 /home/student-linfo2347/mininet/topo.py 20262410
+    cd "$HOME" && sudo -E python3 /home/student-linfo2347/mininet/topo.py
 else
     echo -e "${BLUE}[INFO] To run the topology later, use:${NC}"
-    echo -e "${YELLOW}sudo mn -c && sudo -E python3 /home/student-linfo2347/mininet/topo.py 20262410${NC}"
+    echo -e "${YELLOW}sudo mn -c && sudo -E python3 /home/student-linfo2347/mininet/topo.py${NC}"
 fi
