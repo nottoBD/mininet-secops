@@ -5,7 +5,7 @@
 - **[1. ARP Cache Poisoning](#1-arp-cache-poisoning)**
   - [1.1 Attack ](#11-attack)
   - [1.2 Protections](#12-protections)
-- **[2. Network Scan](#2-network-scan)**
+- **[2. Network Port Scan](#2-network-port-scan)**
   - [2.1 Attack ](#21-attack)
   - [2.2 Protections](#22-protections)
 
@@ -137,5 +137,72 @@ iifname "r2-eth0" ip saddr 10.2.0.0/24 ip daddr 10.1.0.0/24 ct state established
 - **Blocking**: Poisoning attempts blocked within 1–5 packets.  
 - **Detection**: Logs record events (e.g., `R1-ARP-SPOOF`, `R2-IMPERSONATION`).  
 
+---
+
+## 2. Network Port Scan
+*see walkthrough at: [attacks/network_port_scan/execution_example.md](attacks/network_port_scan/execution_example.md)*
+## 2.1 Attack
+
+**Target Selection**
+* **Focus**: DMZ servers at 10.12.0.10 (HTTP), 10.12.0.20 (DNS), 10.12.0.30 (NTP), and 10.12.0.40 (FTP).
+* **Goal**: Discover active services and vulnerabilities in the DMZ network segment.
+
+**Scanning Techniques**
+* **TCP Connect Scan**: Multi-threaded (100 threads) scan establishes full connections to detect open ports.
+* **Scope**: Default range of 1-1000 ports (expandable to all 65535 ports with `--full` flag).
+* **Service Enumeration**: Retrieves service banners, HTTP headers, and DNS data.
+* **UDP Targeting**: Tests specific UDP services (DNS on 53/5353, NTP on 123).
+
+**Attack Execution**
+* **MAC/IP Discovery**: No prerequisite ARP poisoning needed; direct scanning.
+* **Rate Management**: No built-in scan rate limiting in attack script.
+* **Service Fingerprinting**:
+  * HTTP (80): Extracts headers from web server (10.12.0.10)
+  * DNS (5353): Performs queries for "exemple.com" (10.12.0.20)
+  * NTP (123): Extracts version and stratum info (10.12.0.30)
+  * FTP (21): Captures service banner (10.12.0.40)
+
+**Constraints**
+* **Attacker Position**: Attack effectiveness depends on location:
+  * From workstation LAN: Limited by router r1's forward policy.
+  * From Internet: Restricted by r2's rate limiting and blacklisting.
+  * From DMZ itself: Constrained by server output filtering.
+
+## 2.2 Protections
+
+**Router R1 (`r1_port_scan_protection.nft`)**
+* **Default Policy**: DROP for all forwarded traffic.
+* **Workstation Access**:
+  * Allows 10.1.0.0/24 hosts to initiate connections to any destination.
+* **Response Filtering**:
+  * Only allows DMZ/Internet to respond to established workstation connections.
+  * Blocks new inbound connections to workstations.
+* **Weaknesses**:
+  * No rate limiting for outbound connection attempts.
+  * No explicit port scan detection mechanisms.
+
+**Router R2 (`r2_port_scan_protection.nft`)**
+* **Blacklist Mechanism**:
+  * Dynamic IP blacklist with 30-minute timeout.
+  * Logs and blocks all traffic from blacklisted sources.
+* **Rate Limiting Triggers**:
+  * TCP: >5 SYN packets/second (burst 10)
+  * UDP: >5 packets/second (burst 5)
+* **Connection Rules**:
+  * Allows workstations to initiate connections to any destination.
+  * Permits Internet hosts to connect to DMZ servers.
+  * Restricts DMZ servers to only responding to established connections.
+  * Routes DMZ-to-workstation traffic via R1.
+
+**DMZ Servers (`dmz_port_scan_protection.nft`)**
+* **Output Restrictions**:
+  * Only permits established/related connections to specific networks.
+  * Destinations limited to workstations, Internet, and router IPs.
+* **Default Policies**:
+  * ACCEPT for input (relies on router filtering)
+  * DROP for forward and output.
+* **Weaknesses**:
+  * No input filtering to prevent scan detection.
+  * No host-based rate limiting.
 
 ---

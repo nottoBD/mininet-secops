@@ -1,0 +1,6 @@
+py r1.cmd("sudo nft -f mininet/protections/network_port_scan/r1_port_scan_protection.nft")
+py r2.cmd("sudo nft -f mininet/protections/network_port_scan/r2_port_scan_protection.nft")
+py dns.cmd("sudo nft -f mininet/protections/network_port_scan/dmz_port_scan_protection.nft")
+py http.cmd("sudo nft -f mininet/protections/network_port_scan/dmz_port_scan_protection.nft")
+py ftp.cmd("sudo nft -f mininet/protections/network_port_scan/dmz_port_scan_protection.nft")
+py ntp.cmd("sudo nft -f mininet/protections/network_port_scan/dmz_port_scan_protection.nft")
