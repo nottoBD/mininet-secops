@@ -18,7 +18,7 @@ ws2 sudo tcpdump -i ws2-eth0 -n -w /tmp/attack_capture.pcap &
 ws2 sysctl -w net.ipv4.ip_forward=1
 
 # Run the attack with explicit parameters
-ws2 cd mininet/attacks/arp_cache_poisoning/ && python3 main.py --target 10.1.0.3 --gateway 10.1.0.1 --interval 0.5 &
+ws2 python3 mininet/attacks/arp_cache_poisoning/main.py --target 10.1.0.3 --gateway 10.1.0.1 --interval 0.5 &
 
 # Verify ARP poisoning was successful (should show ws2's MAC)
 ws3 arp -n
@@ -52,7 +52,7 @@ ws3 sudo nft list ruleset
 ### 1.3. Test Attack With Protection
 ```bash
 # Try attack again - should be limited by rate limiter
-ws2 cd mininet/attacks/arp_cache_poisoning/ && python3 main.py --target 10.1.0.3 --gateway 10.1.0.1 &
+ws2 python3 mininet/attacks/arp_cache_poisoning/main.py --target 10.1.0.3 --gateway 10.1.0.1 &
 
 # Verify ARP table remains unchanged (legitimate gateway MAC)
 ws3 arp -n
