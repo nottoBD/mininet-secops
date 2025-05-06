@@ -22,5 +22,8 @@ table inet filter {
 
             # Internet → Workstations (returns)
             iifname "r2-eth0" ip saddr 10.2.0.0/24 ip daddr 10.1.0.0/24 ct state established,related accept
+            
+            # Dans la chaine "forward" de firewall_r2.nft :
+            tcp dport 21 accept      # Autoriser le trafic FTP entrant
       }
 }
