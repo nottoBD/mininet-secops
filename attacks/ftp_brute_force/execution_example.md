@@ -6,3 +6,6 @@ write_enable=YES
 
 
 sudo systemctl restart vsftpd
+
+protection : 
+source protections/ftp_brute_force/run_ftp_brute_force_protection.py
