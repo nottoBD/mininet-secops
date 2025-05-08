@@ -388,7 +388,7 @@ iifname "r2-eth0" ip saddr 10.2.0.0/24 ip daddr 10.1.0.0/24 ct state established
 * **Requires High Bandwidth**: Needs significant outbound bandwidth to be effective at scale.
 * **Detectability**: Can be detected through abnormal SYN-to-ACK ratios and high packet rates.
 
-## 3.2 Protections
+## 4.2 Protections
 
 **Router R1 (`r1_syn_flood_protection.nft)`)**
 * **Default Policy**: DROP for all forwarded traffic.
