@@ -14,6 +14,9 @@ table arp dmz_arp {
     chain input {
         type filter hook input priority filter; policy drop;
 
+        # Drop non-broadcast replies (gratuitous ARP)
+        arp operation reply ether daddr != ff:ff:ff:ff:ff:ff drop
+
         # Allow ARP requests (rate limited)
         arp operation request meter arp_requests { ether saddr limit rate 5/minute } accept
 
