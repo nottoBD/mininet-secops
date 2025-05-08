@@ -1,6 +1,0 @@
-py r1.cmd("sudo nft -f mininet/protections/ftp_brute_force/r1_ftpbf_protection.nft")
-py r2.cmd("sudo nft -f mininet/protections/ftp_brute_force/r2_ftpbf_protection.nft")
-py dns.cmd("sudo nft -f mininet/protections/ftp_brute_force/dmz_ftpbf_protection.nft")
-py http.cmd("sudo nft -f mininet/protections/ftp_brute_force/dmz_ftpbf_protection.nft")
-py ftp.cmd("sudo nft -f mininet/protections/ftp_brute_force/dmz_ftpbf_protection.nft")
-py ntp.cmd("sudo nft -f mininet/protections/ftp_brute_force/dmz_ftpbf_protection.nft")

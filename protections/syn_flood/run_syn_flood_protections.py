@@ -1,0 +1,6 @@
+py r1.cmd("sudo nft -f mininet/protections/syn_flood/r1_syn_flood_protection.nft")
+py r2.cmd("sudo nft -f mininet/protections/syn_flood/r2_syn_flood_protection.nft")
+py dns.cmd("sudo nft -f mininet/protections/syn_flood/dmz_syn_flood_protection.nft")
+py http.cmd("sudo nft -f mininet/protections/syn_flood/dmz_syn_flood_protection.nft")
+py ftp.cmd("sudo nft -f mininet/protections/syn_flood/dmz_syn_flood_protection.nft")
+py ntp.cmd("sudo nft -f mininet/protections/syn_flood/dmz_syn_flood_protection.nft")
