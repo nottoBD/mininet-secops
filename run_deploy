@@ -104,6 +104,7 @@ else
     if [ $? -eq 0 ]; then
         echo -e "${PURPLE}[CONFIG] Installing required dependencies...${NC}"
         pip3 install -r "$TARGET_DIR/requirements.txt"
+        sudo apt install python3-texttable
         echo -e "${GREEN}[SUCCESS] Dependencies installed successfully${NC}"
     else
         echo -e "${BLUE}[INFO] Dependencies already installed${NC}"

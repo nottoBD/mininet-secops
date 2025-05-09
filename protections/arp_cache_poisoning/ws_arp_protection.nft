@@ -19,6 +19,6 @@ table arp ws_arp {
         arp operation reply arp saddr ip 10.1.0.1 ether saddr != @gateway_mac drop
 
         # Rate limit replies
-        arp operation reply arp saddr ip 10.1.0.0/24 limit rate 10/minute accept
+        arp operation reply arp saddr ip 10.1.0.0/24 limit rate 5/minute accept
     }
 }

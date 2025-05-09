@@ -17,6 +17,12 @@ table arp r2_arp {
     chain input {
         type filter hook input priority filter; policy drop;
 
+        # Validate ARP requests for R2's IP
+        arp operation request arp saddr ip 10.12.0.2 ether saddr != @r2_mac \
+            add @suspicious_hosts { ether saddr } \
+            log prefix "R2-IMPERSONATION-REQUEST: " \
+            drop
+
         # Allow ARP requests
         arp operation request accept
 

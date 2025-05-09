@@ -10,6 +10,7 @@
   - [2.2 Protections](#22-protections)
 
 ---
+GitHub source: https://github.com/nottoBD/mininet-secops
 
 ## i. General Setup
 
@@ -80,7 +81,7 @@ iifname "r2-eth0" ip saddr 10.2.0.0/24 ip daddr 10.1.0.0/24 ct state established
 - **Execution**: Forged replies sent to `ws3` and `r1` (1/second).  
 - **Blocked By**:  
   - `r1`’s trusted mappings (fixed IP-MAC pairs).  
-  - DMZ rules dropping non-broadcast replies (dest MAC ≠ `ff:ff:ff:ff:ff:ff`).
+  - DMZ rules enforcing static MAC bindings for routers, rate limiting replies.
 
 #### Traffic Interception
 - **Success Criteria**: Poisoned ARP caches enable MITM for:  
