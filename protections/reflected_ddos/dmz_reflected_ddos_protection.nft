@@ -1,0 +1,27 @@
+#!/usr/sbin/nft -f
+
+flush ruleset
+
+table inet filter {
+    chain input {
+        type filter hook input priority 0; policy accept;
+
+        ip protocol udp ip daddr {10.12.0.20, 10.12.0.30} ip saddr {10.2.0.0/24} jump protect_services
+    }
+
+    chain forward {
+        type filter hook forward priority 0; policy drop;
+
+    }
+
+    chain output {
+        type filter hook output priority 0; policy drop;
+
+        ip daddr {10.2.0.0/24, 10.1.0.0/24, 10.12.0.1, 10.12.0.2} ct state established,related accept
+
+    }
+
+    chain protect_services {
+        ip saddr != {10.2.0.0/24} drop
+    }
+}

@@ -1,0 +1,6 @@
+py r1.cmd("sudo nft -f mininet/protections/reflected_ddos/r1_reflectd_ddos_protection.nft")
+py r2.cmd("sudo nft -f mininet/protections/reflected_ddos/r2_reflectd_ddos_protection.nft")
+py dns.cmd("sudo nft -f mininet/protections/reflected_ddos/dmz_reflectd_ddos_protection.nft")
+py ftp.cmd("sudo nft -f mininet/protections/reflected_ddos/dmz_reflectd_ddos_protection.nft")
+py ntp.cmd("sudo nft -f mininet/protections/reflected_ddos/dmz_reflectd_ddos_protection.nft")
+py http.cmd("sudo nft -f mininet/protections/reflected_ddos/dmz_reflectd_ddos_protection.nft") 
