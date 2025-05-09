@@ -18,39 +18,35 @@ ws2 python3 mininet/attacks/arp_cache_poisoning/main.py --target 10.1.0.3 --gate
 ```
 4. **Verify Poisoning (Victim: ws3)**
 
-
 - Attacker's MAC should appear for both gateway and workstation in victim ARP table
 ```bash
 ws3 arp -n  
 ```
 5. **Test MITM (Victim: ws3)**  
 ```bash 
-ws3 ping -c 3 10.12.0.10 
+ws3 ping -c 10 10.12.0.10 
 ```
 
 ## Protection Scenario  
 **Objective:** Demonstrate effective ARP spoofing protection  
 
-1. **Apply Protection Rules (All Workstations)**  
-```bash  
-ws3 sudo nft -f mininet/protections/arp_cache_poisoning/ws_arp_protection.nft  
-ws2 sudo nft -f mininet/protections/arp_cache_poisoning/ws_arp_protection.nft  
+1. **Apply Protection Rules (All Workstations and their gateway)**  
+```bash 
+r1 sudo nft -f mininet/protections/arp_cache_poisoning/r1_arp_protection.nft
+r2 sudo nft -f mininet/protections/arp_cache_poisoning/r2_arp_protection.nft
+ws3 sudo nft -f mininet/protections/arp_cache_poisoning/ws_arp_protection.nft
+ws2 sudo nft -f mininet/protections/arp_cache_poisoning/ws_arp_protection.nft
 ```
 2. **Verify Rules**  
 ```bash  
 ws3 sudo nft list ruleset
 ```
-3**Attacker Setup (ws2)**  
 
-- Enable MITM forwarding  
-```bash 
-ws2 sysctl -w net.ipv4.ip_forward=1
-```
-4. **Launch Attack (ws2)**  
+3. **Launch Attack (ws2)**  
 ```bash  
 ws2 python3 mininet/attacks/arp_cache_poisoning/main.py --target 10.1.0.3 --gateway 10.1.0.1
 ```
-5. **Test Protection (Victim: ws3)**  
+4. **Test Protection (Victim: ws3)**  
 - Shows 100% packet loss
 ```bash  
 ws3 ping -c 3 10.12.0.10
@@ -92,7 +88,7 @@ internet python3 mininet/attacks/network_port_scan/main.py
 ### 2.2 Apply Basic Protections
 ```bash
 # Deploy protections on gateway router
-r2 python3 mininet/protections/network_port_scan/r2_port_scan_protection.nft
+r2 sudo nft -f mininet/protections/network_port_scan/r2_port_scan_protection.nft
 ```
 
 ### 2.3 Attack (After Protection)

