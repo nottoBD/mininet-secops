@@ -3,18 +3,12 @@
 ## No Protection Scenario  
 **Objective:** Demonstrate successful ARP cache poisoning attack  
 
-1. **Initial Verification (Victim: `ws3`)**  
-
-- Verify gateway connectivity 
-
-- Show original ARP table
+1. **Initial Verification (Victim: `ws3`)**
 ```bash  
 ws3 ping -c 3 10.1.0.1 
 ws3 arp -n               
 ```
 2. **Attacker Setup (ws2)**  
-
-- Enable MITM forwarding  
 ```bash 
 ws2 sysctl -w net.ipv4.ip_forward=1
 ```
@@ -25,7 +19,7 @@ ws2 python3 mininet/attacks/arp_cache_poisoning/main.py --target 10.1.0.3 --gate
 4. **Verify Poisoning (Victim: ws3)**
 
 
-- Attacker's MAC should appear for both gateway and workstation   
+- Attacker's MAC should appear for both gateway and workstation in victim ARP table
 ```bash
 ws3 arp -n  
 ```
@@ -33,11 +27,6 @@ ws3 arp -n
 ```bash 
 ws3 ping -c 3 10.12.0.10 
 ```
-*RESTART*
-
-*RESTART*
-
-*RESTART*
 
 ## Protection Scenario  
 **Objective:** Demonstrate effective ARP spoofing protection  
@@ -67,6 +56,53 @@ ws2 python3 mininet/attacks/arp_cache_poisoning/main.py --target 10.1.0.3 --gate
 ws3 ping -c 3 10.12.0.10
 ```
 
-# Il drop les packets qui se font passer pour la gateway avec une addresse MAC différente que celle hardcodée 
-# Il y a aussi l'ARP request rate limiting
-# Et enfin le Reply Rate Limiting
+### Il drop les packets qui se font passer pour la gateway avec une addresse MAC différente que celle hardcodée 
+### Il y a aussi l'ARP request rate limiting
+### Et enfin le Reply Rate Limiting
+
+---
+*RESTART*
+
+
+*SHOW SLIDES*
+
+---
+
+# Port Scan Demonstration Guide
+
+## No Protection Scenario  
+
+
+### 2.0 Initial Assessment
+```bash
+# Test FTP server
+internet curl ftp://10.12.0.40/README
+# Test NTP server
+internet ntpdate -q 10.12.0.30
+# Test mDNS server
+internet dig @10.12.0.20 -p 5353 example.com
+```
+
+### 2.1 Initial Scan (Before Protection)
+```bash
+# Run port scan attack
+internet python3 mininet/attacks/network_port_scan/main.py
+```
+
+### 2.2 Apply Basic Protections
+```bash
+# Deploy protections on gateway router
+r2 python3 mininet/protections/network_port_scan/r2_port_scan_protection.nft
+```
+
+### 2.3 Attack (After Protection)
+```bash
+# Run port scan attack
+internet python3 mininet/attacks/network_port_scan/main.py
+```
+
+### 2.3. Traffic Inspection
+```bash
+# Examine blacklisted IPs
+r2 nft list set inet filter blacklist
+```
