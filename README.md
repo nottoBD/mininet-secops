@@ -8,6 +8,12 @@
 - **[2. Network Port Scan](#2-network-port-scan)**
   - [2.1 Attack ](#21-attack)
   - [2.2 Protections](#22-protections)
+- **[3. Reflected DDoS](#3-reflected-ddos)**
+  - [3.1 Attack ](#31-attack)
+  - [3.2 Protections](#32-protections)
+- **[4. Syn flood](#4-syn-flood)**
+  - [4.1 Attack ](#41-attack)
+  - [4.2 Protections](#42-protections)
 
 ---
 GitHub source: https://github.com/nottoBD/mininet-secops
